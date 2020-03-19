@@ -1,7 +1,9 @@
 #include <iostream>
 #include <string>
 #include <ctime>
+#include <chrono>
 #include <iomanip>
+#include <unordered_map>
 #include <string.h>
 #include <unistd.h>
 
@@ -41,6 +43,7 @@ void log(std::string msg) {
 
 int main(int argc, char **argv) {
     int opt;
+    int period = 0;
     int frequency = 0;
     int verbose = 0;
 
@@ -63,6 +66,13 @@ int main(int argc, char **argv) {
 
             case 'f':
                 frequency = atoi(optarg);
+                if (frequency <= 0) {
+                    frequency = 0;
+                    period = 0;
+                }
+                else {
+                    period = 1000000/frequency;
+                }
                 break;
             
             case 'v':
@@ -96,6 +106,7 @@ int main(int argc, char **argv) {
 
     log("using DBC file " + dbc_path);
     log("using frequency " + std::to_string(frequency) + " Hz");
+    log("using period " + std::to_string(period) + " us");
     log("using MQTT host " + mqtt_host + ":" + std::to_string(mqtt_port));
 
     int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -105,6 +116,10 @@ int main(int argc, char **argv) {
     struct can_frame frame;
 
     int nbytes;
+
+    using clock = std::chrono::high_resolution_clock;
+
+    std::unordered_map< canid_t, clock::time_point > next_publish;
 
     strcpy(ifr.ifr_name, iface.c_str());
     ioctl(s, SIOCGIFINDEX, &ifr);
@@ -123,12 +138,19 @@ int main(int argc, char **argv) {
         nbytes = read(s, &frame, sizeof(struct can_frame));
 
         const Message* msg = net->getMessageById(frame.can_id);
+
+        if (clock::now() < next_publish[frame.can_id]) {
+            if (verbose) log("dropped message from " + std::to_string(frame.can_id) + " because of frequency limit");
+            continue;
+        }
         
+        next_publish[frame.can_id] = clock::now() + std::chrono::microseconds(period);
+
         if (msg) {
             (*msg).forEachSignal(
                 [&](const Signal& signal) {
                     double raw = signal.decode(frame.data);
-                    log(signal.getComment() + " " + std::to_string(signal.rawToPhys(raw)));
+                    if (verbose) log(signal.getComment() + " " + std::to_string(signal.rawToPhys(raw)));
                 });
         }
     }
