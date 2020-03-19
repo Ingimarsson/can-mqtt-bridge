@@ -1,21 +1,19 @@
 # can-mqtt-bridge
 
-**Note:** this program is incomplete.
-
 This program listens for messages on a CAN bus interface, decodes them according to a DBC file and forwards them to an MQTT broker. The DBC file must include an MQTT topic in the comment field of each signal.
 
 The program is written for a real-time telemetry system for a racecar, but can surely be used in many other scenarios.
 
 ## Installation
 
-First you will need to install the following dependencies.
+First you will need to install the following libraries.
 
  - dbcppp
- - paho-mqtt
+ - paho.mqtt.cpp
 
 Now you can compile the program.
 
-    $ g++ can-mqtt.cpp -o can-mqtt -ldbcppp
+    $ g++ can-mqtt-bridge.cpp -o can-mqtt-bridge -ldbcppp -lpaho-mqttpp3 -lpaho-mqtt3as
 
 ## Usage
 
