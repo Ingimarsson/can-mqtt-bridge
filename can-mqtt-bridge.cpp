@@ -160,7 +160,12 @@ int main(int argc, char **argv) {
             (*msg).forEachSignal(
                 [&](const Signal& signal) {
                     double raw = signal.decode(frame.data);
-                    cli.publish(signal.getComment(), std::to_string(signal.rawToPhys(raw)));
+                    try {
+                        cli.publish(signal.getComment(), std::to_string(signal.rawToPhys(raw)));
+                    }
+                    catch (const mqtt::exception& exc) {
+                        log(exc.what());
+                    }
                     if (verbose) log(signal.getComment() + " " + std::to_string(signal.rawToPhys(raw)));
                 });
         }
