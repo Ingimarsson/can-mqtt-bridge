@@ -15,10 +15,8 @@
 #include <linux/can/raw.h>
 
 #include <fstream>
-#include <dbcppp/Network.h>
+#include <Vector/DBC.h>
 #include <mqtt/async_client.h>
-
-using namespace dbcppp;
 
 void print_usage() {
     std::cout << "can-mqtt-bridge: Decode and forward CAN bus signals to an MQTT broker.\n" << std::endl;
@@ -127,8 +125,10 @@ int main(int argc, char **argv) {
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
 
+    Vector::DBC::Network network;
     std::ifstream dbc_file(dbc_path);
-    auto net = Network::fromDBC(dbc_file);
+
+    dbc_file >> network;
 
     mqtt::async_client cli(mqtt_host+":"+std::to_string(mqtt_port), "");
     mqtt::connect_options connopts;
@@ -144,10 +144,11 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+
     while (1) {
         nbytes = read(s, &frame, sizeof(struct can_frame));
 
-        const Message* msg = net->getMessageById(frame.can_id);
+        Vector::DBC::Message & message = network.messages[frame.can_id];
 
         if (clock::now() < next_publish[frame.can_id]) {
             if (verbose) log("dropped message from " + std::to_string(frame.can_id) + " because of frequency limit");
@@ -156,18 +157,20 @@ int main(int argc, char **argv) {
         
         next_publish[frame.can_id] = clock::now() + std::chrono::microseconds(period);
 
-        if (msg) {
-            (*msg).forEachSignal(
-                [&](const Signal& signal) {
-                    double raw = signal.decode(frame.data);
-                    try {
-                        cli.publish(signal.getComment(), std::to_string(signal.rawToPhys(raw)));
-                    }
-                    catch (const mqtt::exception& exc) {
-                        log(exc.what());
-                    }
-                    if (verbose) log(signal.getComment() + " " + std::to_string(signal.rawToPhys(raw)));
-                });
+        std::vector<unsigned char> data(frame.data, frame.data + sizeof frame.data / sizeof frame.data[0]);
+
+        for (const auto & signal : message.signals) {
+            unsigned int rawValue = signal.second.decode(data);
+            double physicalValue = signal.second.rawToPhysicalValue(rawValue);
+
+            try {
+                cli.publish(signal.second.comment, std::to_string(physicalValue));
+            }
+            catch (const mqtt::exception& exc) {
+                log(exc.what());
+            }
+
+            if (verbose) log(signal.second.comment + " " + std::to_string(physicalValue));
         }
     }
 }
