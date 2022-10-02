@@ -8,12 +8,12 @@ The program is written for a real-time telemetry system for a racecar, but can s
 
 First you will need to install the following libraries.
 
- - dbcppp
- - paho.mqtt.cpp
+ - Vector_DBC ([Bitbucket](https://bitbucket.org/tobylorenz/vector_dbc/src/master/))
+ - paho.mqtt.cpp ([GitHub](https://github.com/eclipse/paho.mqtt.cpp))
 
 Now you can compile the program.
 
-    $ g++ can-mqtt-bridge.cpp -o can-mqtt-bridge -ldbcppp -lpaho-mqttpp3 -lpaho-mqtt3as
+    $ g++ can-mqtt-bridge.cpp -o can-mqtt-bridge -lVector_DBC -lpaho-mqttpp3 -lpaho-mqtt3as
 
 ## Usage
 
